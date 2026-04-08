@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>元梦之星 UGC买量知识库</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-dark">
+
+<!-- 密码验证遮罩 -->
+<div id="authOverlay" style="position:fixed;inset:0;z-index:99999;background:#0f0f1a;display:flex;justify-content:center;align-items:center">
+  <div style="background:#1a1a2e;border:1px solid #2a2a45;border-radius:16px;padding:40px;width:360px;text-align:center">
+    <div style="font-size:28px;margin-bottom:12px">✦</div>
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px;background:linear-gradient(135deg,#a29bfe,#f8a5c2);-webkit-background-clip:text;-webkit-text-fill-color:transparent">元梦之星 UGC买量知识库</h2>
+    <p style="font-size:12px;color:#8888a8;margin-bottom:24px">请输入访问密码</p>
+    <input type="password" id="authPassInput" placeholder="输入密码" onkeydown="if(event.key==='Enter')checkAuth()" style="width:100%;padding:12px 16px;background:#0f0f1a;border:1px solid #2a2a45;border-radius:8px;color:#e8e8f0;font-size:14px;text-align:center;outline:none;margin-bottom:16px">
+    <div id="authError" style="color:#ff6b6b;font-size:12px;margin-bottom:12px;display:none">密码错误</div>
+    <button onclick="checkAuth()" style="width:100%;padding:12px;background:#6c5ce7;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer">进入知识库</button>
+  </div>
+</div>
+<script>
+(function(){
+  // ===== 修改这里的密码 =====
+  const ACCESS_PASSWORD = 'ymzx2026';
+  // ========================
+  const KEY = 'ymzx_auth_passed';
+  if(localStorage.getItem(KEY)==='1'){document.getElementById('authOverlay').style.display='none';return;}
+  window.checkAuth=function(){
+    const input=document.getElementById('authPassInput').value;
+    if(input===ACCESS_PASSWORD){localStorage.setItem(KEY,'1');document.getElementById('authOverlay').style.display='none';}
+    else{document.getElementById('authError').style.display='block';document.getElementById('authPassInput').value='';document.getElementById('authPassInput').focus();}
+  };
+  document.getElementById('authPassInput').focus();
+})();
+</script>
+
+<!-- 侧边栏 -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo"><span class="logo-icon">✦</span><span class="logo-text">元梦之星</span></div>
+    <div class="logo-sub">UGC买量知识库</div>
+  </div>
+  <nav class="nav-menu" id="navMenu"></nav>
+  <div class="nav-actions">
+    <button class="nav-add-btn" onclick="openNavEditModal()" title="新增目录">+ 新增目录</button>
+  </div>
+  <div class="sidebar-footer">
+    <div class="theme-switch"><button id="themeBtn" onclick="toggleTheme()">🌙 暗色</button></div>
+    <button class="btn-export-all" onclick="exportAllData()">📥 导出数据</button>
+    <button class="btn-import-all" onclick="document.getElementById('importFile').click()">📤 导入数据</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAllData(event)">
+  </div>
+</aside>
+
+<!-- 导航编辑弹窗 -->
+<div class="modal-overlay" id="navEditModal">
+  <div class="modal modal-small">
+    <div class="modal-header"><h3 id="navEditTitle">新增目录</h3><button class="modal-close" onclick="closeModal('navEditModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label>图标 (Emoji)</label><input type="text" id="navIconInput" placeholder="如 📁 📋 🎬" maxlength="4"></div>
+      <div class="form-row"><label>目录名称</label><input type="text" id="navLabelInput" placeholder="输入名称"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" id="navDeleteBtn" style="display:none;margin-right:auto" onclick="deleteNavItem()">删除</button>
+      <button class="btn-secondary" onclick="closeModal('navEditModal')">取消</button>
+      <button class="btn-primary" onclick="saveNavItem()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 主内容 -->
+<main class="main-content">
+  <header class="top-bar">
+    <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+    <div class="search-box"><span>🔍</span><input type="text" placeholder="全局搜索..." id="globalSearch" oninput="globalSearchHandler(this.value)"></div>
+    <div class="top-right"><span class="date-display" id="dateDisplay"></span></div>
+  </header>
+
+  <!-- ==================== 文档中心 ==================== -->
+  <section class="tab-content active" id="tab-docs">
+    <div class="page-header">
+      <h1>📁 文档中心</h1>
+      <div class="page-header-right">
+        <button class="btn-secondary btn-icon" onclick="openWidgetPanel('docs')">⚙ 组件</button>
+        <button class="btn-primary" onclick="openDocLinkQuick()">+ 添加链接</button>
+        <button class="btn-secondary" onclick="openDocModalFull()">+ 完整新建</button>
+      </div>
+    </div>
+    <div class="widgets-area" id="widgetsArea-docs"></div>
+    <div class="filter-bar">
+      <div class="filter-tags" id="docFilterTags"></div>
+      <div class="filter-right">
+        <button class="btn-secondary btn-small" onclick="openSubCatModal('docs')">✏️ 管理分类</button>
+        <select id="docSortSelect" onchange="renderDocs()">
+          <option value="updated">最近更新</option><option value="created">创建时间</option><option value="title">按标题</option>
+        </select>
+      </div>
+    </div>
+    <div class="doc-list" id="docList"></div>
+    <!-- 快速添加链接弹窗 -->
+    <div class="modal-overlay" id="docLinkQuickModal">
+      <div class="modal modal-small">
+        <div class="modal-header"><h3>快速添加外部文档</h3><button class="modal-close" onclick="closeModal('docLinkQuickModal')">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-row"><label>粘贴链接</label><input type="text" id="docQuickLinkInput" placeholder="https://docs.qq.com/..." oninput="autoDetectTitle(this.value)"></div>
+          <div class="form-row"><label>文档名称 <span style="color:var(--text-muted);font-weight:400">(自动识别)</span></label><input type="text" id="docQuickTitleInput" placeholder="自动从链接识别"></div>
+          <div class="form-row"><label>分类</label><select id="docQuickCatSelect"></select></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeModal('docLinkQuickModal');openDocModalFull()">详细编辑</button>
+          <button class="btn-primary" onclick="saveQuickDoc()">添加</button>
+        </div>
+      </div>
+    </div>
+    <!-- 完整文档编辑弹窗 -->
+    <div class="modal-overlay" id="docModal">
+      <div class="modal modal-large">
+        <div class="modal-header"><h3 id="docModalTitle">编辑文档</h3><button class="modal-close" onclick="closeModal('docModal')">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-row"><label>外部链接</label><input type="text" id="docLinkInput" placeholder="腾讯文档、飞书等链接"></div>
+          <div class="form-row two-col">
+            <div><label>标题</label><input type="text" id="docTitleInput" placeholder="文档标题"></div>
+            <div><label>分类</label><select id="docCategorySelect"></select></div>
+          </div>
+          <div class="form-row two-col">
+            <div><label>作者</label><input type="text" id="docAuthorInput" placeholder="作者"></div>
+            <div><label>状态</label><select id="docStatusSelect"><option value="草稿">草稿</option><option value="审核中">审核中</option><option value="已发布">已发布</option></select></div>
+          </div>
+          <div class="form-row"><label>备注</label><textarea id="docContentInput" rows="4" placeholder="简要备注"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeModal('docModal')">取消</button>
+          <button class="btn-primary" onclick="saveDoc()">保存</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 工作进度 ==================== -->
+  <section class="tab-content" id="tab-progress">
+    <div class="page-header">
+      <h1>📋 工作进度</h1>
+      <div class="page-header-right">
+        <button class="btn-secondary btn-icon" onclick="openWidgetPanel('progress')">⚙ 组件</button>
+        <button class="btn-primary" onclick="openTaskModal()">+ 新建任务</button>
+      </div>
+    </div>
+    <div class="widgets-area" id="widgetsArea-progress"></div>
+    <!-- 本周工作重点 -->
+    <div class="week-focus-card">
+      <div class="wf-header"><h4>🎯 本周工作重点</h4><button class="btn-small" id="weekFocusSaveBtn" onclick="saveWeekFocus()" style="display:none">保存</button></div>
+      <div class="wf-body" id="weekFocusBody" contenteditable="true" oninput="document.getElementById('weekFocusSaveBtn').style.display=''" placeholder="点击输入本周工作重点..."></div>
+    </div>
+    <div class="progress-summary" id="progressSummary"></div>
+    <!-- 日历 -->
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calPrevMonth()">◀</button>
+      <h3 id="calMonthTitle"></h3>
+      <button class="cal-nav-btn" onclick="calNextMonth()">▶</button>
+      <button class="btn-secondary btn-small" onclick="calGoToday()" style="margin-left:12px">今天</button>
+    </div>
+    <div class="cal-grid"><div class="cal-weekday">一</div><div class="cal-weekday">二</div><div class="cal-weekday">三</div><div class="cal-weekday">四</div><div class="cal-weekday">五</div><div class="cal-weekday">六</div><div class="cal-weekday">日</div></div>
+    <div class="cal-grid cal-days" id="calDays"></div>
+    <!-- 任务弹窗 -->
+    <div class="modal-overlay" id="taskModal">
+      <div class="modal">
+        <div class="modal-header"><h3 id="taskModalTitle">新建任务</h3><button class="modal-close" onclick="closeModal('taskModal')">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-row"><label>任务名称</label><input type="text" id="taskNameInput" placeholder="输入任务名称"></div>
+          <div class="form-row two-col">
+            <div><label>优先级</label><select id="taskPrioritySelect"><option value="P0">P0 - 紧急</option><option value="P1" selected>P1 - 重要</option><option value="P2">P2 - 普通</option></select></div>
+            <div><label>负责人</label><input type="text" id="taskOwnerInput" placeholder="负责人"></div>
+          </div>
+          <div class="form-row two-col">
+            <div><label>日期</label><input type="date" id="taskDueInput"></div>
+            <div><label>状态</label><select id="taskStatusSelect"><option value="待开始">待开始</option><option value="进行中">进行中</option><option value="已完成">已完成</option></select></div>
+          </div>
+          <div class="form-row"><label>描述</label><textarea id="taskDescInput" rows="3" placeholder="任务描述"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-danger" id="taskDeleteBtn" style="display:none;margin-right:auto" onclick="deleteTask()">删除</button>
+          <button class="btn-secondary" onclick="closeModal('taskModal')">取消</button>
+          <button class="btn-primary" onclick="saveTask()">保存</button>
+        </div>
+      </div>
+    </div>
+    <!-- 日期详情弹窗 -->
+    <div class="modal-overlay" id="dayDetailModal">
+      <div class="modal">
+        <div class="modal-header"><h3 id="dayDetailTitle"></h3><button class="modal-close" onclick="closeModal('dayDetailModal')">&times;</button></div>
+        <div class="modal-body" id="dayDetailBody"></div>
+        <div class="modal-footer"><button class="btn-primary" id="dayAddTaskBtn">+ 添加任务</button><button class="btn-secondary" onclick="closeModal('dayDetailModal')">关闭</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 素材投放 ==================== -->
+  <section class="tab-content" id="tab-material">
+    <div class="page-header">
+      <h1>🎬 素材投放</h1>
+      <div class="page-header-right">
+        <button class="btn-primary" onclick="openMaterialModal()">+ 新增素材</button>
+      </div>
+    </div>
+    <!-- 月日历 -->
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="matCalPrev()">◀</button>
+      <h3 id="matCalTitle"></h3>
+      <button class="cal-nav-btn" onclick="matCalNext()">▶</button>
+      <button class="btn-secondary btn-small" onclick="matCalToday()" style="margin-left:12px">本月</button>
+    </div>
+    <div class="cal-grid"><div class="cal-weekday">一</div><div class="cal-weekday">二</div><div class="cal-weekday">三</div><div class="cal-weekday">四</div><div class="cal-weekday">五</div><div class="cal-weekday">六</div><div class="cal-weekday">日</div></div>
+    <div class="cal-grid cal-days" id="matCalDays"></div>
+
+    <!-- 新增/编辑素材弹窗 -->
+    <div class="modal-overlay" id="materialModal">
+      <div class="modal">
+        <div class="modal-header"><h3 id="materialModalTitle">新增素材</h3><button class="modal-close" onclick="closeModal('materialModal')">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-row two-col">
+            <div><label>地图名称</label><input type="text" id="matMapInput" placeholder="投放的地图名称"></div>
+            <div><label>投放渠道</label><input type="text" id="matChannelInput" placeholder="抖音、快手、B站"></div>
+          </div>
+          <div class="form-row two-col">
+            <div><label>投放日期</label><input type="date" id="matDateInput"></div>
+            <div><label>投放进度</label><select id="matStatusSelect"><option value="投放中">投放中</option><option value="已下线">已下线</option></select></div>
+          </div>
+          <div class="form-row"><label>备注</label><textarea id="matNoteInput" rows="2" placeholder="备注（可选）"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-danger" id="matDeleteBtn" style="display:none;margin-right:auto" onclick="deleteMaterial()">删除</button>
+          <button class="btn-secondary" onclick="closeModal('materialModal')">取消</button>
+          <button class="btn-primary" onclick="saveMaterial()">保存</button>
+        </div>
+      </div>
+    </div>
+    <!-- 日期详情弹窗 -->
+    <div class="modal-overlay" id="matDayModal">
+      <div class="modal">
+        <div class="modal-header"><h3 id="matDayTitle"></h3><button class="modal-close" onclick="closeModal('matDayModal')">&times;</button></div>
+        <div class="modal-body" id="matDayBody"></div>
+        <div class="modal-footer"><button class="btn-primary" id="matDayAddBtn">+ 新增素材</button><button class="btn-secondary" onclick="closeModal('matDayModal')">关闭</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 数据回收 ==================== -->
+  <section class="tab-content" id="tab-data">
+    <div class="page-header">
+      <h1>📈 数据回收</h1>
+      <div class="page-header-right">
+        <button class="btn-secondary btn-icon" onclick="openWidgetPanel('data')">⚙ 组件</button>
+        <button class="btn-primary" onclick="openDataModal()">+ 新增渠道数据</button>
+      </div>
+    </div>
+    <div class="widgets-area" id="widgetsArea-data"></div>
+    <div class="data-kpi-grid" id="dataKPIGrid"></div>
+    <div class="data-table-section">
+      <div class="table-header-bar"><h3>渠道数据明细</h3><div><select id="dataDateFilter" onchange="renderDataTable()"><option value="all">全部日期</option></select><button class="btn-export" onclick="exportDataCSV()">📥 导出CSV</button></div></div>
+      <table class="data-table" id="dataTable">
+        <thead><tr><th>日期</th><th>渠道</th><th>消耗(万)</th><th>曝光(万)</th><th>点击(万)</th><th>CTR</th><th>新增用户</th><th>CPA(元)</th><th>ROI</th><th>操作</th></tr></thead>
+        <tbody id="dataTableBody"></tbody>
+      </table>
+    </div>
+    <div class="charts-row"><div class="chart-card wide"><div class="chart-header"><h3>消耗与新增趋势</h3></div><canvas id="dataTrendChart" height="280"></canvas></div></div>
+    <div class="modal-overlay" id="dataModal">
+      <div class="modal">
+        <div class="modal-header"><h3 id="dataModalTitle">新增渠道数据</h3><button class="modal-close" onclick="closeModal('dataModal')">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-row two-col"><div><label>日期</label><input type="date" id="dataDateInput"></div><div><label>渠道</label><select id="dataChannelSelect"><option>抖音</option><option>快手</option><option>B站</option><option>微信</option><option>小红书</option><option>微博</option><option>其他</option></select></div></div>
+          <div class="form-row two-col"><div><label>消耗(万元)</label><input type="number" id="dataCostInput" step="0.1"></div><div><label>曝光(万)</label><input type="number" id="dataExposureInput" step="1"></div></div>
+          <div class="form-row two-col"><div><label>点击(万)</label><input type="number" id="dataClickInput" step="0.1"></div><div><label>新增用户</label><input type="number" id="dataUserInput" step="1"></div></div>
+          <div class="form-row"><label>ROI</label><input type="number" id="dataROIInput" step="0.01"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-danger" id="dataDeleteBtn" style="display:none;margin-right:auto" onclick="deleteDataRow()">删除</button>
+          <button class="btn-secondary" onclick="closeModal('dataModal')">取消</button>
+          <button class="btn-primary" onclick="saveDataRow()">保存</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 团队协作 ==================== -->
+  <section class="tab-content" id="tab-team">
+    <div class="page-header">
+      <h1>👥 团队协作</h1>
+      <div class="page-header-right"><button class="btn-secondary btn-icon" onclick="openWidgetPanel('team')">⚙ 组件</button></div>
+    </div>
+    <div class="widgets-area" id="widgetsArea-team"></div>
+    <div class="team-layout">
+      <div class="team-left">
+        <div class="section-header"><h3>📢 沟通记录</h3></div>
+        <div class="msg-input-area">
+          <input type="text" id="msgAuthorInput" placeholder="你的名字" class="msg-author-input">
+          <textarea id="msgContentInput" rows="3" placeholder="输入沟通内容..."></textarea>
+          <button class="btn-primary" onclick="addMessage()">发送</button>
+        </div>
+        <div class="msg-list" id="msgList"></div>
+      </div>
+      <div class="team-right">
+        <div class="section-header"><h3>📝 待办事项</h3><button class="btn-small" onclick="openTodoModal()">+ 添加</button></div>
+        <div class="todo-list" id="teamTodoList"></div>
+      </div>
+    </div>
+    <div class="modal-overlay" id="todoModal">
+      <div class="modal modal-small">
+        <div class="modal-header"><h3>添加待办</h3><button class="modal-close" onclick="closeModal('todoModal')">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-row"><label>待办内容</label><input type="text" id="todoTitleInput" placeholder="待办事项"></div>
+          <div class="form-row two-col"><div><label>指派给</label><input type="text" id="todoAssignInput" placeholder="负责人"></div><div><label>截止日期</label><input type="date" id="todoDueInput"></div></div>
+          <div class="form-row"><label>优先级</label><select id="todoPrioritySelect"><option value="紧急">紧急</option><option value="普通" selected>普通</option></select></div>
+        </div>
+        <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('todoModal')">取消</button><button class="btn-primary" onclick="saveTodo()">保存</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 组件配置面板 -->
+<div class="modal-overlay" id="widgetPanelModal">
+  <div class="modal"><div class="modal-header"><h3>⚙ 配置页面组件</h3><button class="modal-close" onclick="closeModal('widgetPanelModal')">&times;</button></div><div class="modal-body" id="widgetPanelBody"></div><div class="modal-footer"><button class="btn-primary" onclick="closeModal('widgetPanelModal')">完成</button></div></div>
+</div>
+<!-- 子目录管理弹窗 -->
+<div class="modal-overlay" id="subCatModal">
+  <div class="modal modal-small">
+    <div class="modal-header"><h3 id="subCatModalTitle">管理分类</h3><button class="modal-close" onclick="closeModal('subCatModal')">&times;</button></div>
+    <div class="modal-body"><div class="subcat-list" id="subCatList"></div><div class="subcat-add-row"><input type="text" id="subCatNewInput" placeholder="输入新分类名称"><button class="btn-primary" onclick="addSubCategory()">添加</button></div></div>
+    <div class="modal-footer"><button class="btn-primary" onclick="closeModal('subCatModal');refreshCurrentTab()">完成</button></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
