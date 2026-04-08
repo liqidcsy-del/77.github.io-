@@ -261,3 +261,16 @@ select{cursor:pointer}textarea{resize:vertical}
 
 @media(max-width:1100px){.data-kpi-grid{grid-template-columns:repeat(2,1fr)}.team-layout{grid-template-columns:1fr}}
 @media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main-content{margin-left:0}.menu-toggle{display:block}.data-kpi-grid{grid-template-columns:1fr}.doc-list{grid-template-columns:1fr}.tab-content{padding:16px}.form-row.two-col{grid-template-columns:1fr}}
+
+/* Cloud Sync */
+.sync-bar{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.sync-status{flex:1;display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--bg);border:1px solid var(--border);font-size:11px;color:var(--text-sec);overflow:hidden;white-space:nowrap;transition:all .3s}
+.sync-status .sync-icon{flex-shrink:0;font-size:12px}
+.sync-status .sync-text{overflow:hidden;text-overflow:ellipsis}
+.sync-status.sync-success{border-color:rgba(0,206,201,.3);color:var(--green)}
+.sync-status.sync-error{border-color:rgba(255,107,107,.3);color:var(--red)}
+.sync-status.sync-syncing{border-color:rgba(108,92,231,.3);color:var(--primary-light)}
+.sync-status.sync-loading{border-color:rgba(253,203,110,.3);color:var(--orange)}
+.btn-cloud{width:34px;height:34px;border-radius:var(--radius-sm);background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;flex-shrink:0}
+.btn-cloud:hover{border-color:var(--primary);background:rgba(108,92,231,.1);color:var(--primary-light)}
+#gistConfigModal code{background:var(--bg);padding:1px 6px;border-radius:3px;font-size:11px}

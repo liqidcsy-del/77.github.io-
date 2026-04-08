@@ -48,6 +48,10 @@
     <button class="nav-add-btn" onclick="openNavEditModal()" title="新增目录">+ 新增目录</button>
   </div>
   <div class="sidebar-footer">
+    <div class="sync-bar">
+      <div class="sync-status" id="syncStatus"><span class="sync-icon">💾</span><span class="sync-text">本地模式</span></div>
+      <button class="btn-cloud" onclick="openGistConfigModal()" title="配置云同步">☁</button>
+    </div>
     <div class="theme-switch"><button id="themeBtn" onclick="toggleTheme()">🌙 暗色</button></div>
     <button class="btn-export-all" onclick="exportAllData()">📥 导出数据</button>
     <button class="btn-import-all" onclick="document.getElementById('importFile').click()">📤 导入数据</button>
@@ -323,6 +327,32 @@
 <!-- 组件配置面板 -->
 <div class="modal-overlay" id="widgetPanelModal">
   <div class="modal"><div class="modal-header"><h3>⚙ 配置页面组件</h3><button class="modal-close" onclick="closeModal('widgetPanelModal')">&times;</button></div><div class="modal-body" id="widgetPanelBody"></div><div class="modal-footer"><button class="btn-primary" onclick="closeModal('widgetPanelModal')">完成</button></div></div>
+</div>
+
+<!-- Gist 云同步配置弹窗 -->
+<div class="modal-overlay" id="gistConfigModal">
+  <div class="modal modal-small">
+    <div class="modal-header"><h3>☁ 配置云同步</h3><button class="modal-close" onclick="closeModal('gistConfigModal')">&times;</button></div>
+    <div class="modal-body">
+      <div style="background:rgba(108,92,231,.08);border:1px solid rgba(108,92,231,.2);border-radius:8px;padding:14px;margin-bottom:16px;font-size:12px;line-height:1.8;color:var(--text-sec)">
+        <div style="font-weight:600;color:var(--primary-light);margin-bottom:6px">📖 配置说明（只需操作一次）</div>
+        <b>第1步</b>：打开 <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--primary-light);text-decoration:underline">GitHub Token 页面</a>，勾选 <code style="background:var(--bg);padding:1px 6px;border-radius:3px">gist</code> 权限，生成一个 Token 并复制<br>
+        <b>第2步</b>：打开 <a href="https://gist.github.com/" target="_blank" style="color:var(--primary-light);text-decoration:underline">GitHub Gist</a>，新建一个 Gist（内容随意），从 URL 中复制 Gist ID（URL 最后一段）<br>
+        <b>第3步</b>：将 Token 和 Gist ID 填入下方保存即可
+      </div>
+      <div class="form-row"><label>GitHub Personal Access Token</label><input type="password" id="gistTokenInput" placeholder="ghp_xxxxxxxxxxxx"></div>
+      <div class="form-row"><label>Gist ID</label><input type="text" id="gistIdInput" placeholder="如 a1b2c3d4e5f6..."></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-secondary" onclick="forceCloudPull()" style="font-size:11px;padding:6px 12px">⬇ 强制从云端拉取</button>
+        <button class="btn-secondary" onclick="forceCloudPush()" style="font-size:11px;padding:6px 12px">⬆ 强制推送到云端</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="disconnectGist()" style="margin-right:auto">断开同步</button>
+      <button class="btn-secondary" onclick="closeModal('gistConfigModal')">取消</button>
+      <button class="btn-primary" onclick="saveGistConfigFromUI()">保存并验证</button>
+    </div>
+  </div>
 </div>
 <!-- 子目录管理弹窗 -->
 <div class="modal-overlay" id="subCatModal">

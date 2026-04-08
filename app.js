@@ -1,12 +1,129 @@
-// 元梦之星 UGC买量知识库 - 回退稳定版
+// 元梦之星 UGC买量知识库 - GitHub Gist 云同步版
 const STORAGE_KEYS = {
   docs:'ymzx_docs',tasks:'ymzx_tasks',materials:'ymzx_materials',dataRows:'ymzx_data_rows',
   messages:'ymzx_messages',todos:'ymzx_todos',navItems:'ymzx_nav_items',theme:'ymzx_theme',
   widgets:'ymzx_widgets',customNotes:'ymzx_custom_notes',subCategories:'ymzx_sub_categories',weekFocus:'ymzx_week_focus'
 };
+
+// ===== GitHub Gist 云同步 =====
+const GIST_CONFIG_KEY = 'ymzx_gist_config';
+const SYNC_DATA_FILE = 'ymzx_data.json';
+const CLOUD_KEYS = ['docs','tasks','materials','dataRows','messages','todos','navItems','widgets','customNotes','subCategories','weekFocus'];
+let _gistConfig = null;
+let _syncTimer = null;
+let _syncDirty = false;
+let _cloudData = null;
+let _cloudReady = false;
+
+function getGistConfig(){
+  if(_gistConfig) return _gistConfig;
+  try{ _gistConfig = JSON.parse(localStorage.getItem(GIST_CONFIG_KEY)); } catch{}
+  return _gistConfig;
+}
+function saveGistConfig(cfg){
+  _gistConfig = cfg;
+  localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify(cfg));
+}
+function isCloudEnabled(){ return !!getGistConfig()?.token && !!getGistConfig()?.gistId; }
+
+function updateSyncStatus(status, msg){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  const map = {syncing:'🔄',success:'✅',error:'❌',offline:'💾',loading:'⏳'};
+  el.innerHTML = `<span class="sync-icon">${map[status]||'💾'}</span><span class="sync-text">${msg||''}</span>`;
+  el.className = 'sync-status sync-'+status;
+}
+
+async function gistApiGet(){
+  const cfg = getGistConfig();
+  if(!cfg?.token || !cfg?.gistId) return null;
+  const resp = await fetch('https://api.github.com/gists/'+cfg.gistId, {
+    headers: {'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'}
+  });
+  if(!resp.ok) throw new Error('Gist读取失败: '+resp.status);
+  const data = await resp.json();
+  const file = data.files[SYNC_DATA_FILE];
+  if(!file) return {};
+  return JSON.parse(file.content);
+}
+
+async function gistApiPut(allData){
+  const cfg = getGistConfig();
+  if(!cfg?.token || !cfg?.gistId) return;
+  const resp = await fetch('https://api.github.com/gists/'+cfg.gistId, {
+    method:'PATCH',
+    headers: {'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+    body: JSON.stringify({ files:{ [SYNC_DATA_FILE]:{ content: JSON.stringify(allData) } } })
+  });
+  if(!resp.ok) throw new Error('Gist写入失败: '+resp.status);
+}
+
+function collectAllCloudData(){
+  const data = {};
+  CLOUD_KEYS.forEach(k => {
+    try{ data[k] = JSON.parse(localStorage.getItem(STORAGE_KEYS[k])); }catch{ data[k] = null; }
+  });
+  return data;
+}
+
+function applyCloudData(data){
+  if(!data) return;
+  CLOUD_KEYS.forEach(k => {
+    if(data[k] !== undefined && data[k] !== null){
+      localStorage.setItem(STORAGE_KEYS[k], JSON.stringify(data[k]));
+    }
+  });
+}
+
+async function cloudPull(){
+  if(!isCloudEnabled()) return;
+  try{
+    updateSyncStatus('loading','正在从云端加载...');
+    const data = await gistApiGet();
+    if(data && Object.keys(data).length > 0){
+      _cloudData = data;
+      applyCloudData(data);
+      _cloudReady = true;
+      updateSyncStatus('success','云端数据已加载');
+    } else {
+      _cloudReady = true;
+      updateSyncStatus('success','云端为空，使用本地数据');
+      scheduleSyncPush();
+    }
+  }catch(e){
+    console.error('云端拉取失败:', e);
+    _cloudReady = true;
+    updateSyncStatus('error','云端拉取失败: '+e.message);
+  }
+}
+
+function scheduleSyncPush(){
+  _syncDirty = true;
+  if(_syncTimer) clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(doSyncPush, 1500);
+}
+
+async function doSyncPush(){
+  if(!isCloudEnabled() || !_syncDirty) return;
+  _syncDirty = false;
+  try{
+    updateSyncStatus('syncing','正在同步到云端...');
+    const data = collectAllCloudData();
+    await gistApiPut(data);
+    updateSyncStatus('success','已同步到云端');
+  }catch(e){
+    console.error('云端推送失败:', e);
+    updateSyncStatus('error','同步失败: '+e.message);
+    _syncDirty = true;
+  }
+}
+
 function loadData(k){try{return JSON.parse(localStorage.getItem(STORAGE_KEYS[k]))||[];}catch{return[];}}
 function loadObj(k){try{return JSON.parse(localStorage.getItem(STORAGE_KEYS[k]))||{};}catch{return{};}}
-function saveData(k,d){localStorage.setItem(STORAGE_KEYS[k],JSON.stringify(d));}
+function saveData(k,d){
+  localStorage.setItem(STORAGE_KEYS[k],JSON.stringify(d));
+  if(isCloudEnabled() && CLOUD_KEYS.includes(k)) scheduleSyncPush();
+}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function today(){return new Date().toISOString().split('T')[0];}
 function nowStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
@@ -31,9 +148,21 @@ const WIDGET_DEFS={
 };
 
 // ===== Init =====
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('dateDisplay').textContent=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
-  initTheme();initNav();renderDocs();renderTasks();renderMaterials();renderDataSection();renderMessages();renderTodos();renderAllWidgets();initWeekFocus();
+  initTheme();
+  if(isCloudEnabled()){
+    updateSyncStatus('loading','正在从云端加载...');
+    try {
+      await cloudPull();
+    } catch(e) {
+      console.error(e);
+      updateSyncStatus('error','云端加载失败，使用本地数据');
+    }
+  } else {
+    updateSyncStatus('offline','本地模式（点击 ☁ 配置云同步）');
+  }
+  initNav();renderDocs();renderTasks();renderMaterials();renderDataSection();renderMessages();renderTodos();renderAllWidgets();initWeekFocus();
 });
 
 // ===== Theme =====
@@ -282,4 +411,64 @@ function deleteTodo(id){saveData('todos',loadData('todos').filter(t=>t.id!==id))
 
 // ===== Export/Import =====
 function exportAllData(){const data={};Object.keys(STORAGE_KEYS).forEach(k=>{try{data[k]=JSON.parse(localStorage.getItem(STORAGE_KEYS[k]));}catch{data[k]=null;}});const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download=`元梦之星买量知识库_${today()}.json`;a.click();}
-function importAllData(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=(e)=>{try{const data=JSON.parse(e.target.result);if(confirm('导入将覆盖当前所有数据，确定？')){Object.keys(STORAGE_KEYS).forEach(k=>{if(data[k]!==undefined)localStorage.setItem(STORAGE_KEYS[k],JSON.stringify(data[k]));});location.reload();}}catch{alert('格式错误');}};reader.readAsText(file);event.target.value='';}
+function importAllData(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=(e)=>{try{const data=JSON.parse(e.target.result);if(confirm('导入将覆盖当前所有数据，确定？')){Object.keys(STORAGE_KEYS).forEach(k=>{if(data[k]!==undefined)localStorage.setItem(STORAGE_KEYS[k],JSON.stringify(data[k]));});if(isCloudEnabled()) scheduleSyncPush();location.reload();}}catch{alert('格式错误');}};reader.readAsText(file);event.target.value='';}
+
+// ===== Gist 配置管理 =====
+function openGistConfigModal(){
+  const cfg = getGistConfig() || {};
+  document.getElementById('gistTokenInput').value = cfg.token || '';
+  document.getElementById('gistIdInput').value = cfg.gistId || '';
+  openModal('gistConfigModal');
+}
+
+async function saveGistConfigFromUI(){
+  const token = document.getElementById('gistTokenInput').value.trim();
+  const gistId = document.getElementById('gistIdInput').value.trim();
+  if(!token || !gistId){ alert('请填写完整的 Token 和 Gist ID'); return; }
+  const btn = document.querySelector('#gistConfigModal .btn-primary');
+  btn.textContent = '验证中...'; btn.disabled = true;
+  try {
+    const resp = await fetch('https://api.github.com/gists/'+gistId, {
+      headers: {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(!resp.ok) throw new Error('无法访问 Gist ('+resp.status+')');
+    saveGistConfig({token, gistId});
+    closeModal('gistConfigModal');
+    updateSyncStatus('success','云同步已配置');
+    if(confirm('是否立即将本地数据上传到云端？（其他设备将看到这些数据）')){
+      await doSyncPush();
+      alert('数据已同步到云端！');
+    }
+  } catch(e) {
+    alert('验证失败: '+e.message+'\n请检查 Token 和 Gist ID 是否正确');
+  } finally {
+    btn.textContent = '保存并验证'; btn.disabled = false;
+  }
+}
+
+function disconnectGist(){
+  if(!confirm('确定断开云同步？数据将仅保存在本地浏览器。')) return;
+  localStorage.removeItem(GIST_CONFIG_KEY);
+  _gistConfig = null;
+  closeModal('gistConfigModal');
+  updateSyncStatus('offline','本地模式（点击 ☁ 配置云同步）');
+}
+
+async function forceCloudPull(){
+  if(!isCloudEnabled()){ alert('请先配置云同步'); return; }
+  if(!confirm('强制从云端拉取将覆盖本地数据，确定？')) return;
+  try{
+    await cloudPull();
+    location.reload();
+  }catch(e){ alert('拉取失败: '+e.message); }
+}
+
+async function forceCloudPush(){
+  if(!isCloudEnabled()){ alert('请先配置云同步'); return; }
+  if(!confirm('强制推送将用本地数据覆盖云端数据，确定？')) return;
+  try{
+    _syncDirty = true;
+    await doSyncPush();
+    alert('已推送到云端');
+  }catch(e){ alert('推送失败: '+e.message); }
+}
